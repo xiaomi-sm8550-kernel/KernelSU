@@ -5,32 +5,21 @@ on:
     branches: [ "main", "dev", "ci" ]
     paths:
       - '.github/workflows/build-manager.yml'
-      - '.github/workflows/build-lkm.yml'
       - '.github/workflows/ksud.yml'
       - 'manager/**'
-      - 'kernel/**'
-      - 'userspace/**'
+      - 'userspace/ksud/**'
   pull_request:
     branches: [ "main", "dev" ]
     paths:
       - '.github/workflows/build-manager.yml'
-      - '.github/workflows/build-lkm.yml'
       - '.github/workflows/ksud.yml'
       - 'manager/**'
-      - 'kernel/**'
-      - 'userspace/**'
+      - 'userspace/ksud/**'
   workflow_call:
+  workflow_dispatch:
 
 jobs:
-  build-lkm:
-    uses: ./.github/workflows/build-lkm.yml
-    secrets: inherit
-
-  build-ksuinit:
-    uses: ./.github/workflows/ksuinit.yml
-
   build-ksud:
-    needs: [build-lkm, build-ksuinit]
     strategy:
       matrix:
         include:
@@ -42,26 +31,8 @@ jobs:
     with:
       target: ${{ matrix.target }}
       os: ${{ matrix.os }}
-  
-  build-ksud-extra:
-    needs: [build-lkm, build-ksuinit]
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-pc-windows-gnu # windows pc
-            os: ubuntu-latest
-          - target: x86_64-apple-darwin # Intel mac
-            os: macos-latest
-          - target: aarch64-apple-darwin # M chip mac
-            os: macos-latest
-          - target: aarch64-unknown-linux-musl # arm64 Linux
-            os: ubuntu-latest
-          - target: x86_64-unknown-linux-musl # x86 Linux
-            os: ubuntu-latest
-    uses: ./.github/workflows/ksud.yml
-    with:
-      target: ${{ matrix.target }}
-      os: ${{ matrix.os }}
+      pack_lkm: false
+      pack_ksuinit: false
 
   build-manager:
     needs: build-ksud
@@ -85,18 +56,14 @@ jobs:
             echo "UPLOAD=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Write key
-        if: ${{ ( github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' )) || github.ref_type == 'tag' }}
+      - name: Setup signing
         run: |
-          if [ ! -z "${{ secrets.KEYSTORE }}" ]; then
-            {
-              echo KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
-              echo KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
-              echo KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
-              echo KEYSTORE_FILE='key.jks'
-            } >> gradle.properties
-            echo ${{ secrets.KEYSTORE }} | base64 -d > key.jks
-          fi
+          {
+            echo KEYSTORE_PASSWORD='android'
+            echo KEY_ALIAS='key'
+            echo KEY_PASSWORD='android'
+            echo KEYSTORE_FILE='keystore/release.jks'
+          } >> gradle.properties
 
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -134,7 +101,6 @@ jobs:
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v6
-        if: ${{ ( github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' )) || github.ref_type == 'tag' }}
         with:
           name: manager
           path: manager/app/build/outputs/apk/release/*.apk

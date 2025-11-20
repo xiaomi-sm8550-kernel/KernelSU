@@ -74,11 +74,10 @@ def check_environ():
     if BRANCH is None:
         print("[-] Invalid BRANCH")
         exit(1)
-    if MESSAGE_THREAD_ID is None:
-        print("[-] Invaild MESSAGE_THREAD_ID")
-        exit(1)
-    else:
+    if MESSAGE_THREAD_ID:
         MESSAGE_THREAD_ID = int(MESSAGE_THREAD_ID)
+    else:
+        MESSAGE_THREAD_ID = None
 
 
 async def main():
